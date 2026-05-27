@@ -1,4 +1,4 @@
-import { VIEW_MODES, type ViewMode } from '../constants';
+import { VIEW_MODES, type SerializableViewMode, type ViewMode } from '../constants';
 
 type ViewModeControllerOptions = {
   getMode: () => ViewMode;
@@ -27,6 +27,6 @@ export class ViewModeController {
   }
 
   private isViewMode(mode: string | undefined): mode is ViewMode {
-    return VIEW_MODES.includes(mode as ViewMode);
+    return VIEW_MODES.includes(mode as SerializableViewMode);
   }
 }

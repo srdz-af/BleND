@@ -68,6 +68,7 @@ export class HypercubeRenderer {
   group: THREE.Group;
   geometry!: THREE.BufferGeometry;
   line!: THREE.LineSegments<THREE.BufferGeometry, THREE.LineBasicMaterial>;
+  vertexPoints?: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>;
   mesh?: THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
   positions!: Float32Array;
   M!: number;
@@ -75,6 +76,7 @@ export class HypercubeRenderer {
   offset = new THREE.Vector3();
   originPosition = new THREE.Vector3();
   private lineMaterial: THREE.LineBasicMaterial;
+  private vertexPointMaterial: THREE.PointsMaterial;
   private solidMaterial: THREE.MeshStandardMaterial;
   private glassMaterial: THREE.MeshPhysicalMaterial;
   private facetedMaterial: THREE.MeshStandardMaterial;
@@ -95,6 +97,16 @@ export class HypercubeRenderer {
     this.group = new THREE.Group();
     this.scene.add(this.group);
     this.lineMaterial = new THREE.LineBasicMaterial({ color: 0xe5efff, transparent: true, opacity: 0.95 });
+    this.vertexPointMaterial = new THREE.PointsMaterial({
+      color: 0xe6e6e6,
+      size: 4,
+      sizeAttenuation: false,
+      transparent: true,
+      opacity: 0.96,
+      depthTest: true,
+      depthWrite: false,
+      vertexColors: true,
+    });
     this.solidMaterial = new THREE.MeshStandardMaterial({
       color: this.surface.color,
       metalness: this.surface.metalness,
@@ -155,6 +167,13 @@ export class HypercubeRenderer {
     this.line.visible = this.mode === 'wireframe';
     this.group.add(this.line);
 
+    const vertexGeometry = new THREE.BufferGeometry();
+    vertexGeometry.setAttribute('position', this.geometry.getAttribute('position'));
+    vertexGeometry.setAttribute('color', this.buildVertexColorAttribute(M));
+    this.vertexPoints = new THREE.Points(vertexGeometry, this.vertexPointMaterial);
+    this.vertexPoints.visible = this.mode === 'vertices';
+    this.group.add(this.vertexPoints);
+
     this.points = Array.from({ length: M }, (_, idx) => {
       const v = new THREE.Vector3() as VertexPoint;
       v.__vertexId = idx;
@@ -164,7 +183,7 @@ export class HypercubeRenderer {
     this.mesh = new THREE.Mesh(new THREE.BufferGeometry(), this.currentSolidMaterial());
     this.mesh.castShadow = true;
     this.mesh.receiveShadow = true;
-    this.mesh.visible = this.mode !== 'wireframe';
+    this.mesh.visible = this.mode !== 'wireframe' && this.mode !== 'vertices';
     this.group.add(this.mesh);
 
     this.surfaceNeedsUpdate = true;
@@ -205,7 +224,7 @@ export class HypercubeRenderer {
     this.geometry.computeBoundingSphere();
     this.geometry.computeBoundingBox();
 
-    if (this.mode !== 'wireframe') {
+    if (this.mode !== 'wireframe' && this.mode !== 'vertices') {
       this.surfaceNeedsUpdate = true;
       this.updateHullGeometry();
     }
@@ -220,14 +239,16 @@ export class HypercubeRenderer {
       this.line.renderOrder = 0;
     }
 
+    if (this.vertexPoints) this.vertexPoints.visible = mode === 'vertices';
+
     if (this.mesh) {
       this.mesh.material = mode === 'faceted' ? this.facetedMaterial : this.currentSolidMaterial();
-      this.mesh.visible = mode !== 'wireframe' && this.mesh.geometry.attributes.position !== undefined;
+      this.mesh.visible = mode !== 'wireframe' && mode !== 'vertices' && this.mesh.geometry.attributes.position !== undefined;
       if (mode !== 'faceted') this.applySurfaceMaterial();
     }
 
-    this.surfaceNeedsUpdate = mode !== 'wireframe';
-    if (mode !== 'wireframe') this.updateHullGeometry();
+    this.surfaceNeedsUpdate = mode !== 'wireframe' && mode !== 'vertices';
+    if (mode !== 'wireframe' && mode !== 'vertices') this.updateHullGeometry();
   }
 
   setSurface(surface: SurfaceMaterial): void {
@@ -256,7 +277,7 @@ export class HypercubeRenderer {
   }
 
   refreshSurface(): void {
-    if (this.mode === 'wireframe' || !this.mesh) return;
+    if (this.mode === 'wireframe' || this.mode === 'vertices' || !this.mesh) return;
     this.surfaceNeedsUpdate = true;
     this.updateHullGeometry();
   }
@@ -280,6 +301,12 @@ export class HypercubeRenderer {
       this.line = undefined as unknown as THREE.LineSegments<THREE.BufferGeometry, THREE.LineBasicMaterial>;
     }
 
+    if (this.vertexPoints) {
+      this.group.remove(this.vertexPoints);
+      this.vertexPoints.geometry.dispose();
+      this.vertexPoints = undefined;
+    }
+
     if (this.mesh) {
       this.group.remove(this.mesh);
       this.mesh.geometry.dispose();
@@ -294,6 +321,7 @@ export class HypercubeRenderer {
     this.dispose();
     this.scene.remove(this.group);
     this.lineMaterial.dispose();
+    this.vertexPointMaterial.dispose();
     this.solidMaterial.dispose();
     this.glassMaterial.dispose();
     this.facetedMaterial.dispose();
@@ -309,8 +337,21 @@ export class HypercubeRenderer {
     this.geometry.setIndex(new THREE.BufferAttribute(array, 1));
   }
 
+  private buildVertexColorAttribute(count: number) {
+    const colors = new Float32Array(Math.max(0, count) * 3);
+    const color = new THREE.Color();
+    for (let i = 0; i < count; i++) {
+      const hue = (i * 0.618033988749895) % 1;
+      color.setHSL(hue, 0.82, 0.62);
+      colors[i * 3] = color.r;
+      colors[i * 3 + 1] = color.g;
+      colors[i * 3 + 2] = color.b;
+    }
+    return new THREE.BufferAttribute(colors, 3);
+  }
+
   private applySurfaceMaterial(): void {
-    if (this.mode === 'faceted') return;
+    if (this.mode === 'faceted' || this.mode === 'vertices') return;
     this.applyStandardSurfaceMaterial();
     this.applyGlassSurfaceMaterial();
     if (this.mesh) this.mesh.material = this.currentSolidMaterial();
@@ -359,7 +400,7 @@ export class HypercubeRenderer {
   }
 
   private updateHullGeometry(): void {
-    if (!this.mesh || !this.surfaceNeedsUpdate || this.mode === 'wireframe') return;
+    if (!this.mesh || !this.surfaceNeedsUpdate || this.mode === 'wireframe' || this.mode === 'vertices') return;
 
     if (!this.surfaceTopology) this.surfaceTopology = this.buildSurfaceTopologyFromCurrentPoints();
     const geometry = this.surfaceTopology

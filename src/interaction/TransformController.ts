@@ -558,6 +558,7 @@ export class TransformController {
     };
     const pushVertex = (vertex: number) => { pushVertexTo(points, vertex); };
     const topology = rendererRef.getCellTopologyForSelection();
+    let faceTintPoints: THREE.Vector3[] | null = null;
     const selectedCellIds = this.selectedCellIds.length
       ? this.selectedCellIds
       : (this.selectedCellId >= 0 ? [this.selectedCellId] : []);
@@ -618,13 +619,13 @@ export class TransformController {
         }
       }
 
-      this.createFaceTintOverlay(tintPoints);
       let edgeEntries = Array.from(edgeCounts.values()).filter(([, , count]) => count === 1);
       if (!edgeEntries.length) edgeEntries = Array.from(edgeCounts.values());
       edgeEntries.forEach(([a, b]) => {
         pushVertex(a);
         pushVertex(b);
       });
+      faceTintPoints = tintPoints;
     }
 
     if (points.length < 2) return;
@@ -639,6 +640,7 @@ export class TransformController {
     const editComponentOverlay = new THREE.LineSegments(geom, mat);
     editComponentOverlay.renderOrder = 22;
     this.editOverlays.setEditComponentOverlay(editComponentOverlay);
+    if (faceTintPoints) this.createFaceTintOverlay(faceTintPoints);
   }
 
   private createFaceTintOverlay(points: THREE.Vector3[]) {

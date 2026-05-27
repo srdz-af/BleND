@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { MAX_N, type ViewMode } from '../constants';
+import { MAX_N, type SerializableViewMode, type ViewMode } from '../constants';
 import { RotND } from '../RotND';
 import { NDProjector, canonicalP } from '../geometry/NDProjector';
 import {
@@ -989,6 +989,10 @@ export class PolypleApp {
       grainIntensity: DEFAULT_GRAIN_INTENSITY,
       antialiasMode: DEFAULT_ANTIALIAS_MODE as AntialiasMode,
     };
+    let lastNonDebugViewMode: SerializableViewMode = 'solid';
+    const serializableViewMode = (mode: ViewMode = PARAMS.renderMode): SerializableViewMode => (
+      mode === 'vertices' ? lastNonDebugViewMode : mode
+    );
     
     const renderEffects = new RenderEffectsController(
       PARAMS,
@@ -1003,7 +1007,7 @@ export class PolypleApp {
         rotMatrix: new Float32Array(rot.matrix),
         axesOrder: completeAxisOrder(axisController.axesOrder),
         axesOffset: axisController.axesOffset,
-        renderMode: PARAMS.renderMode,
+        renderMode: serializableViewMode(),
         bloomIntensity: PARAMS.bloomIntensity,
         motionBlurIntensity: PARAMS.motionBlurIntensity,
         colorHue: PARAMS.colorHue,
@@ -1177,6 +1181,7 @@ export class PolypleApp {
       estimateUndoSnapshotBytes,
       getLights: () => sceneLightService.getLightStates(),
       getTimeline: () => animationTimeline,
+      getSerializableRenderMode: serializableViewMode,
       backgroundController,
       renderEffects,
       paneController,
@@ -1718,21 +1723,29 @@ export class PolypleApp {
       setMode: mode => setViewMode(mode),
     });
     function applyViewMode(mode: ViewMode) {
+      const previousNonDebugMode = lastNonDebugViewMode;
+      if (mode !== 'vertices') lastNonDebugViewMode = mode;
       PARAMS.renderMode = mode;
       rendererND.setMode(mode);
       extraInstances.forEach(inst => {
         inst.renderer.setMode(mode);
       });
+      const showViewportGuides = mode !== 'vertices';
+      axes.visible = showViewportGuides;
+      gridGroup.visible = showViewportGuides;
       textureEditor.updatePanel();
       viewModeController.syncButtons();
       backgroundController.syncForRenderMode();
-      requestSceneUrlUpdate();
+      if (mode !== 'vertices' && mode !== previousNonDebugMode) requestSceneUrlUpdate();
     }
     setViewMode = (mode: ViewMode) => {
       const commit = () => applyViewMode(mode);
       if (viewportInteraction) viewportInteraction.runImmediateOperation('set-view-mode', 'viewport', commit);
       else commit();
     };
+    function toggleVerticesOnlyMode() {
+      setViewMode(PARAMS.renderMode === 'vertices' ? lastNonDebugViewMode : 'vertices');
+    }
     viewModeController.bind();
     backgroundController.syncForRenderMode();
     
@@ -1778,6 +1791,7 @@ export class PolypleApp {
       handleTransformConstraintKey,
       keyboardCamera,
       setViewMode: mode => setViewMode(mode),
+      toggleVerticesOnlyMode,
       toggleRecording: () => viewportCapture.toggleRecording(),
       captureFrame: () => viewportCapture.captureFrame(),
       exportAnimation: () => viewportCapture.renderAnimation(),

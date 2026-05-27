@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { MAX_N, type ViewMode } from '../constants';
+import { MAX_N, type SerializableViewMode, type ViewMode } from '../constants';
 import type { BackgroundController } from '../background/BackgroundController';
 import { RenderEffectsController, clamp01, clampSigned01 } from '../rendering/RenderEffectsController';
 import {
@@ -99,6 +99,7 @@ type SceneStateServiceOptions = {
   estimateUndoSnapshotBytes: () => number;
   getLights: () => SceneLightState[];
   getTimeline: () => KeyframeTimelineController | null;
+  getSerializableRenderMode: () => SerializableViewMode;
   backgroundController: BackgroundController;
   renderEffects: RenderEffectsController;
   paneController: PaneController;
@@ -160,7 +161,7 @@ export class SceneStateService {
       l: snap.label,
       pn: snap.paramsN,
       pk: snap.primitive,
-      rm: params.renderMode,
+      rm: this.options.getSerializableRenderMode(),
       em: params.editMode ? 1 : 0,
       fx: [
         params.bloomIntensity,

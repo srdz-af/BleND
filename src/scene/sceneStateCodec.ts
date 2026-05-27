@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { MAX_N, VIEW_MODES, type ViewMode } from '../constants';
+import { MAX_N, VIEW_MODES, type SerializableViewMode, type ViewMode } from '../constants';
 import type { PrimitiveKind, PrimitiveSurfaceTopology } from '../geometry/primitives';
 import { normalizeAntialiasMode, type AnimationKeyframeState, type AnimationTimelineState, type RenderQuality } from '../animation/KeyframeTimelineController';
 import { DEFAULT_SURFACE, normalizeSurface, type SurfaceState } from './surface';
@@ -160,7 +160,7 @@ export function normalizedAxisDim(value: unknown, fallback = 0) {
 }
 
 export function normalizeViewMode(mode: unknown): ViewMode {
-  return VIEW_MODES.includes(mode as ViewMode) ? mode as ViewMode : 'solid';
+  return VIEW_MODES.includes(mode as SerializableViewMode) ? mode as SerializableViewMode : 'solid';
 }
 
 export function packVec3(vec: THREE.Vector3): PackedVec3 {
