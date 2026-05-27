@@ -220,7 +220,12 @@ export class PolypleApp {
     const renderAxisList = () => axisController.renderAxisList();
     const updateAxisLegend = () => axisController.updateAxisLegend();
     const updateAxisGizmo = () => axisController.updateAxisGizmo();
-    const applyAutoRotation = (dt: number) => axisController.applyAutoRotation(dt);
+    let globalAutoRotationSpeed = 1;
+    const applyAutoRotation = (dt: number) => (
+      globalAutoRotationSpeed > 0
+        ? axisController.applyAutoRotation(dt * globalAutoRotationSpeed)
+        : false
+    );
     let projectionPipeline: ProjectionPipeline | null = null;
     let renderSync: RenderSyncService;
     let sceneLightService: SceneLightService;
@@ -252,7 +257,10 @@ export class PolypleApp {
     };
     
     const perfOverlay = new PerformanceOverlayController();
-    const togglePerfOverlay = () => perfOverlay.toggle();
+    const experimentalFpsOverlayInput = document.getElementById('experimental-fps-overlay') as HTMLInputElement | null;
+    const experimentalVerticesModeInput = document.getElementById('experimental-vertices-mode') as HTMLInputElement | null;
+    const experimentalAutoRotationSpeedInput = document.getElementById('experimental-auto-rotation-speed') as HTMLInputElement | null;
+    const experimentalAutoRotationSpeedValue = document.getElementById('experimental-auto-rotation-speed-value') as HTMLOutputElement | null;
     const recordPerfFrame = (frameStart: number, projectionMs: number, renderMs: number) => {
       perfOverlay.recordFrame(frameStart, projectionMs, renderMs);
     };
@@ -1735,6 +1743,7 @@ export class PolypleApp {
       gridGroup.visible = showViewportGuides;
       textureEditor.updatePanel();
       viewModeController.syncButtons();
+      syncExperimentalControls();
       backgroundController.syncForRenderMode();
       if (mode !== 'vertices' && mode !== previousNonDebugMode) requestSceneUrlUpdate();
     }
@@ -1743,11 +1752,39 @@ export class PolypleApp {
       if (viewportInteraction) viewportInteraction.runImmediateOperation('set-view-mode', 'viewport', commit);
       else commit();
     };
-    function toggleVerticesOnlyMode() {
-      setViewMode(PARAMS.renderMode === 'vertices' ? lastNonDebugViewMode : 'vertices');
+    function setVerticesOnlyMode(enabled: boolean) {
+      if (enabled) {
+        if (PARAMS.renderMode !== 'vertices') setViewMode('vertices');
+      } else if (PARAMS.renderMode === 'vertices') {
+        setViewMode(lastNonDebugViewMode);
+      }
+      syncExperimentalControls();
+    }
+    function setPerfOverlayEnabled(enabled: boolean) {
+      perfOverlay.setVisible(enabled);
+      syncExperimentalControls();
+    }
+    function clampGlobalAutoRotationSpeed(value: number) {
+      return Math.min(10, Math.max(0, Number.isFinite(value) ? value : 1));
+    }
+    function formatGlobalAutoRotationSpeed(value: number) {
+      return `${value.toFixed(2)}x`;
+    }
+    function setGlobalAutoRotationSpeed(value: number) {
+      globalAutoRotationSpeed = clampGlobalAutoRotationSpeed(value);
+      syncExperimentalControls();
+    }
+    function syncExperimentalControls() {
+      if (experimentalFpsOverlayInput) experimentalFpsOverlayInput.checked = perfOverlay.isVisible();
+      if (experimentalVerticesModeInput) experimentalVerticesModeInput.checked = PARAMS.renderMode === 'vertices';
+      if (experimentalAutoRotationSpeedInput) experimentalAutoRotationSpeedInput.value = globalAutoRotationSpeed.toFixed(2);
+      if (experimentalAutoRotationSpeedValue) {
+        experimentalAutoRotationSpeedValue.textContent = formatGlobalAutoRotationSpeed(globalAutoRotationSpeed);
+      }
     }
     viewModeController.bind();
     backgroundController.syncForRenderMode();
+    syncExperimentalControls();
     
     if (M === 0 && extraInstances.length === 0) {
       addInstanceAt(new THREE.Vector3(0, 0, 0), false);
@@ -1783,6 +1820,15 @@ export class PolypleApp {
     dimensionControl.bind();
     sceneFileControls.bind();
     viewportActionControls.bind();
+    experimentalFpsOverlayInput?.addEventListener('change', () => {
+      setPerfOverlayEnabled(experimentalFpsOverlayInput.checked);
+    });
+    experimentalVerticesModeInput?.addEventListener('change', () => {
+      setVerticesOnlyMode(experimentalVerticesModeInput.checked);
+    });
+    experimentalAutoRotationSpeedInput?.addEventListener('input', () => {
+      setGlobalAutoRotationSpeed(Number(experimentalAutoRotationSpeedInput.value));
+    });
     new KeyboardShortcutController({
       isModalOpen: () => modalOverlayController.isOpen(),
       getTransformMode: () => transformController.mode,
@@ -1791,7 +1837,6 @@ export class PolypleApp {
       handleTransformConstraintKey,
       keyboardCamera,
       setViewMode: mode => setViewMode(mode),
-      toggleVerticesOnlyMode,
       toggleRecording: () => viewportCapture.toggleRecording(),
       captureFrame: () => viewportCapture.captureFrame(),
       exportAnimation: () => viewportCapture.renderAnimation(),
@@ -1809,7 +1854,6 @@ export class PolypleApp {
       hasSelection: hasActiveSelection,
       undo: undoSceneSnapshot,
       redo: redoSceneSnapshot,
-      togglePerfOverlay,
       setEditCellDimension,
       changePrimitiveDimension: delta => setNewPrimitiveDimension(PARAMS.N + delta),
     }).bind();

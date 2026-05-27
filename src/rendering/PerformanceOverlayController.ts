@@ -38,12 +38,21 @@ export class PerformanceOverlayController {
     document.body.appendChild(this.overlay);
   }
 
-  toggle() {
-    this.visible = !this.visible;
+  isVisible() {
+    return this.visible;
+  }
+
+  setVisible(visible: boolean) {
+    if (this.visible === visible) return;
+    this.visible = visible;
     this.overlay.style.display = this.visible ? 'block' : 'none';
     this.overlay.setAttribute('aria-hidden', String(!this.visible));
     this.reset();
     if (this.visible) this.overlay.textContent = 'FPS --\nFrame --ms\nCPU --ms\nProj --\nRender --ms';
+  }
+
+  toggle() {
+    this.setVisible(!this.visible);
   }
 
   recordFrame(frameStart: number, projectionMs: number, renderMs: number) {

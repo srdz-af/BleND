@@ -12,7 +12,6 @@ type KeyboardShortcutControllerOptions = {
   handleTransformConstraintKey: (key: string) => boolean;
   keyboardCamera: KeyboardCameraController;
   setViewMode: (mode: ViewMode) => void;
-  toggleVerticesOnlyMode: () => void;
   toggleRecording: () => void;
   captureFrame: () => void;
   exportAnimation: () => void;
@@ -30,7 +29,6 @@ type KeyboardShortcutControllerOptions = {
   hasSelection: () => boolean;
   undo: () => void;
   redo: () => void;
-  togglePerfOverlay: () => void;
   setEditCellDimension: (dimension: EditCellDimension) => void;
   changePrimitiveDimension: (delta: number) => void;
 };
@@ -123,16 +121,6 @@ export class KeyboardShortcutController {
     if ((ev.ctrlKey || ev.metaKey) && ev.shiftKey && !ev.altKey && transformMode === 'none' && key === 'e') {
       ev.preventDefault();
       this.options.exportAnimation();
-      return;
-    }
-    if ((ev.ctrlKey || ev.metaKey) && ev.shiftKey && !ev.altKey && transformMode === 'none' && key === 'd') {
-      ev.preventDefault();
-      this.options.togglePerfOverlay();
-      return;
-    }
-    if ((ev.ctrlKey || ev.metaKey) && !ev.shiftKey && ev.altKey && transformMode === 'none' && key === 'l') {
-      ev.preventDefault();
-      this.options.toggleVerticesOnlyMode();
       return;
     }
     if ((ev.ctrlKey || ev.metaKey) && !ev.shiftKey && !ev.altKey && canReplaceOperation && this.options.isEditMode() && key === 'r') {
